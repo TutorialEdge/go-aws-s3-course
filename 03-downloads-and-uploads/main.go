@@ -11,7 +11,28 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-func listBucketItems(sess *session.Session) {
+func uploadItem(sess *session.Session) {
+	f, err := os.Open("03-downloads-and-uploads/my-file.txt")
+	if err != nil {
+		log.Fatal("could not open file")
+	}
+	defer f.Close()
+
+	uploader := s3manager.NewUploader(sess)
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		ACL:    aws.String("public-read"),
+		Bucket: aws.String("go-aws-s3-course"),
+		Key:    aws.String("my-file.txt"),
+		Body:   f,
+	})
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	log.Printf("Upload Result: %+v\n", result)
+}
+
+func listItems(sess *session.Session) {
 	svc := s3.New(sess)
 	resp, err := svc.ListObjectsV2(
 		&s3.ListObjectsV2Input{
@@ -23,45 +44,19 @@ func listBucketItems(sess *session.Session) {
 	}
 
 	for _, item := range resp.Contents {
-		fmt.Println("Name:         ", *item.Key)
-		fmt.Println("Last modified:", *item.LastModified)
-		fmt.Println("Size:         ", *item.Size)
-		fmt.Println("Storage class:", *item.StorageClass)
-		fmt.Println("")
+		log.Printf("Name: %s\n", *item.Key)
+		log.Printf("Size: %d\n", *item.Size)
 	}
 }
 
-func uploadItem(sess *session.Session) {
-	f, err := os.Open("03-downloads-and-uploads/my-file.txt")
-	if err != nil {
-		log.Fatal("Could not open file")
-	}
-	defer f.Close()
-
-	uploader := s3manager.NewUploader(sess)
-	result, err := uploader.Upload(&s3manager.UploadInput{
-		ACL:    aws.String("public-read"),
-		Bucket: aws.String("go-aws-s3-course"),
-		Key:    aws.String("my-file.txt"),
-		Body:   f,
-	})
-
+func downloadItems(sess *session.Session) {
+	file, err := os.Create("03-downloads-and-uploads/downloaded.txt")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
-	log.Printf("Upload Result: %+v\n", result)
-}
-
-func downloadItem(sess *session.Session) {
-	file, err := os.Create("03-downloads-and-uploads/downloaded.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
 	defer file.Close()
-	downloader := s3manager.NewDownloader(sess)
 
-	// number of bytes downloaded or error
+	downloader := s3manager.NewDownloader(sess)
 	_, err = downloader.Download(file,
 		&s3.GetObjectInput{
 			Bucket: aws.String("go-aws-s3-course"),
@@ -71,7 +66,7 @@ func downloadItem(sess *session.Session) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	log.Println("Successfully downloaded")
+	log.Println("Successfully downloaded file")
 }
 
 func main() {
@@ -82,8 +77,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Could not get session")
 	}
-
 	uploadItem(sess)
-	listBucketItems(sess)
-	downloadItem(sess)
+	listItems(sess)
+	downloadItems(sess)
 }
